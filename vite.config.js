@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -5,12 +6,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 // GitHub Pages 子路徑：https://<帳號>.github.io/lead-capture-pwa/
 const BASE = '/lead-capture-pwa/'
 
+// 版本字串：build 時間 + git short SHA（顯示在浮水印）
+let gitSha = 'dev'
+try {
+  gitSha = execSync('git rev-parse --short HEAD').toString().trim()
+} catch {
+  /* CI 或無 git 環境 */
+}
+// 「MM-DD HH:mm」格式
+const buildTime = new Date().toISOString().slice(5, 16).replace('T', ' ')
+const APP_VERSION = `${buildTime} · ${gitSha}`
+
 export default defineConfig({
   base: BASE,
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION)
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // prompt 模式：新版下載完畢後不自動套用，跳提示讓 user 點「立即更新」
+      registerType: 'prompt',
       includeAssets: ['favicon.svg'],
       manifest: {
         name: '名片捕捉',
