@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { deleteLead, GRADES, PRODUCTS } from '../db/db.js'
+import { deleteLead, GRADES } from '../db/db.js'
 import { useAllLeads } from '../hooks/useLeads.js'
+import { useProducts } from '../store/products.js'
 import LongPressDelete from '../components/LongPressDelete.jsx'
 
 const GRADE_LABEL = Object.fromEntries(GRADES.map((g) => [g.key, g.label]))
-const PRODUCT_LABEL = Object.fromEntries(PRODUCTS.map((p) => [p.key, p.label]))
 
 export default function ListPage() {
   const navigate = useNavigate()
@@ -42,13 +42,18 @@ export default function ListPage() {
 }
 
 function LeadRow({ lead, onOpen }) {
+  const allProducts = useProducts()
+  const productLabel = useMemo(
+    () => Object.fromEntries(allProducts.map((p) => [p.key, p.label])),
+    [allProducts]
+  )
   const photoUrl = useMemo(
     () => (lead.photoBlob ? URL.createObjectURL(lead.photoBlob) : null),
     [lead.photoBlob]
   )
   useEffect(() => () => photoUrl && URL.revokeObjectURL(photoUrl), [photoUrl])
 
-  const products = (lead.tags?.products ?? []).map((k) => PRODUCT_LABEL[k] ?? k)
+  const products = (lead.tags?.products ?? []).map((k) => productLabel[k] ?? k)
   const grade = lead.tags?.grade
 
   return (

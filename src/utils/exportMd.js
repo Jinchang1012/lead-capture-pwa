@@ -1,12 +1,15 @@
-import { PRODUCTS } from '../db/db.js'
+import { getProducts } from '../store/products.js'
 import { fmtIso, fmtTimestampFilename } from './download.js'
 
-const PRODUCT_LABEL = Object.fromEntries(PRODUCTS.map((p) => [p.key, p.label]))
+function productLabelMap() {
+  return Object.fromEntries(getProducts().map((p) => [p.key, p.label]))
+}
 
 // 單筆 lead 轉一份 Markdown 字串
 // 圖片/音檔走相對路徑（zip 內可解析）
 export function buildMarkdown(lead, opts = {}) {
   const { photoPath, audioPath } = opts
+  const PRODUCT_LABEL = productLabelMap()
   const products = (lead.tags?.products ?? []).map((k) => PRODUCT_LABEL[k] ?? k)
   const grade = lead.tags?.grade ?? ''
 

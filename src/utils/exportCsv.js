@@ -1,7 +1,10 @@
-import { PRODUCTS } from '../db/db.js'
+import { getProducts } from '../store/products.js'
 import { downloadBlob, fmtIso, fmtTimestampFilename } from './download.js'
 
-const PRODUCT_LABEL = Object.fromEntries(PRODUCTS.map((p) => [p.key, p.label]))
+// 匯出當下動態取（user 在設定頁改完立即生效）
+function productLabelMap() {
+  return Object.fromEntries(getProducts().map((p) => [p.key, p.label]))
+}
 
 // CSV 欄位：id, createdAt, grade, products, textNote, transcript, transcriptEdited, audioDuration
 const HEADERS = [
@@ -25,6 +28,7 @@ function escapeCsv(value) {
 }
 
 export function buildCsv(leads) {
+  const PRODUCT_LABEL = productLabelMap()
   const lines = [HEADERS.join(',')]
   for (const lead of leads) {
     const products = (lead.tags?.products ?? [])

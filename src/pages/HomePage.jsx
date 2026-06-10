@@ -68,7 +68,16 @@ export default function HomePage() {
       {/* 頂部狀態列 */}
       <div className="flex items-center justify-between text-xs mb-2 gap-2 flex-wrap">
         <ModelChip status={voskStatus} progress={voskProgress} onDownload={downloadModel} />
-        <MicChip state={micState} onTest={testMic} />
+        <div className="flex items-center gap-2">
+          <MicChip state={micState} onTest={testMic} />
+          <button
+            onClick={() => navigate('/settings')}
+            className="px-2 py-1 rounded-full bg-zinc-700 text-zinc-200 font-medium"
+            aria-label="設定"
+          >
+            ⚙️
+          </button>
+        </div>
       </div>
       {persisted === false && (
         <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">

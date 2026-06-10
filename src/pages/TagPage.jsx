@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { GRADES, PRODUCTS, patchLead } from '../db/db.js'
+import { GRADES, patchLead } from '../db/db.js'
 import { useLead } from '../hooks/useLeads.js'
 import { useRecorder } from '../hooks/useRecorder.js'
 import { useVosk } from '../context/VoskContext.jsx'
+import { useFontSize, useProducts } from '../store/products.js'
 import { RECORD_MAX_SECONDS } from '../config.js'
 import TagButton from '../components/TagButton.jsx'
 import RecordButton from '../components/RecordButton.jsx'
@@ -13,6 +14,8 @@ export default function TagPage() {
   const navigate = useNavigate()
   const lead = useLead(id)
   const { status: voskStatus } = useVosk()
+  const PRODUCTS = useProducts()
+  const fontSize = useFontSize()
 
   // 即時轉寫顯示
   const [liveText, setLiveText] = useState('')
@@ -140,6 +143,8 @@ export default function TagPage() {
               onClick={() => setGrade(g.key)}
               sub={g.desc}
               variant="grade"
+              tagClass={fontSize.tagClass}
+              subClass={fontSize.subClass}
             >
               {g.label}
             </TagButton>
@@ -149,7 +154,15 @@ export default function TagPage() {
 
       {/* 產品標籤 */}
       <section>
-        <div className="text-zinc-400 text-sm mb-2">產品關注</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-zinc-400 text-sm">產品關注</div>
+          <button
+            onClick={() => navigate('/settings')}
+            className="text-emerald-400 text-xs"
+          >
+            ✏️ 編輯
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           {PRODUCTS.map((p) => (
             <TagButton
@@ -157,6 +170,8 @@ export default function TagPage() {
               active={products.includes(p.key)}
               onClick={() => toggleProduct(p.key)}
               variant="product"
+              tagClass={fontSize.tagClass}
+              subClass={fontSize.subClass}
             >
               {p.label}
             </TagButton>

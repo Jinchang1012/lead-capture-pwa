@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage.jsx'
 import TagPage from './pages/TagPage.jsx'
 import ListPage from './pages/ListPage.jsx'
 import ExportPage from './pages/ExportPage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/tag/:id" element={<TagPage />} />
           <Route path="/list" element={<ListPage />} />
           <Route path="/export" element={<ExportPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
