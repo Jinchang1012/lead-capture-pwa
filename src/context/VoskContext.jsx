@@ -1,5 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { STORAGE_KEY_VOSK_READY, VOSK_MODEL_URL } from '../config.js'
+import {
+  acquireScreenWakeLock,
+  downloadModelResumable,
+  getPartialProgress,
+  releaseScreenWakeLock
+} from '../utils/modelDownload.js'
 
 // status: 'idle' | 'downloading' | 'ready' | 'error'
 // model: vosk-browser 的 Model 實例（ready 時才有值）
@@ -11,40 +17,30 @@ const VoskContext = createContext({
   reset: () => {}
 })
 
-// 模型下載走自管 Cache Storage（cache-first）：
-// 下載成功後存進 caches('vosk-model-v1')，之後離線直接從快取取，
-// 不依賴 vosk-browser 內部快取行為（該行為無文件保證）
-const MODEL_CACHE = 'vosk-model-v1'
-
-async function fetchModelBlobUrl(url) {
-  let response = null
-  try {
-    const cache = await caches.open(MODEL_CACHE)
-    response = await cache.match(url)
-    if (!response) {
-      // 未快取 → 網路抓 + 存快取
-      response = await fetch(url)
-      if (!response.ok) throw new Error(`模型下載失敗 HTTP ${response.status}`)
-      await cache.put(url, response.clone())
-    }
-  } catch (err) {
-    // Cache Storage 不可用（極舊瀏覽器）→ 直接網路抓
-    if (!response) {
-      response = await fetch(url)
-      if (!response.ok) throw err
-    }
-  }
-  const blob = await response.blob()
-  return URL.createObjectURL(blob)
-}
-
 export function VoskProvider({ children }) {
   const initialReady = typeof window !== 'undefined' && window.localStorage?.getItem(STORAGE_KEY_VOSK_READY) === '1'
   // 初始狀態：localStorage 有 ready 旗標 → 顯示為 ready（樂觀），實際模型實例 lazy load
   const [status, setStatus] = useState(initialReady ? 'ready' : 'idle')
   const [error, setError] = useState(null)
+  // 下載進度 {downloaded, total}（bytes）；null 代表非下載中
+  const [progress, setProgress] = useState(null)
   const modelRef = useRef(null)
   const inflightRef = useRef(null)
+
+  // 啟動時查 partial 進度（如果之前下載到一半被中斷，UI 可顯示「已下載 X / 42 MB，繼續下載」）
+  useEffect(() => {
+    if (status === 'ready') return
+    getPartialProgress(VOSK_MODEL_URL).then((p) => {
+      if (p.complete) {
+        // Cache 內已有完整模型，但 localStorage 旗標掉了 → 補回 ready
+        try { window.localStorage?.setItem(STORAGE_KEY_VOSK_READY, '1') } catch { /* noop */ }
+        setStatus('ready')
+      } else if (p.downloaded > 0 && p.total > 0) {
+        setProgress({ downloaded: p.downloaded, total: p.total })
+      }
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // 真正載入模型：downloading → ready；若已快取會很快
   const download = useCallback(async () => {
@@ -56,9 +52,18 @@ export function VoskProvider({ children }) {
 
     inflightRef.current = (async () => {
       // dynamic import 避免首屏載入巨大 vosk-browser bundle
-      const { createModel } = await import('vosk-browser')
-      // 模型 tarball 走 cache-first：飯店下載一次，展場離線直接用
-      const blobUrl = await fetchModelBlobUrl(VOSK_MODEL_URL)
+      const importPromise = import('vosk-browser')
+
+      // 抓 Wake Lock 防螢幕睡眠 + 防系統殺背景 PWA
+      await acquireScreenWakeLock()
+
+      // 斷點續傳下載（每 2MB 一塊，每塊立即存進 IDB，中斷下次可續）
+      const blob = await downloadModelResumable(VOSK_MODEL_URL, {
+        onProgress: ({ downloaded, total }) => setProgress({ downloaded, total })
+      })
+
+      const blobUrl = URL.createObjectURL(blob)
+      const { createModel } = await importPromise
       let model
       try {
         model = await createModel(blobUrl)
@@ -68,10 +73,9 @@ export function VoskProvider({ children }) {
       modelRef.current = model
       try {
         window.localStorage?.setItem(STORAGE_KEY_VOSK_READY, '1')
-      } catch {
-        // 私密瀏覽模式可能存不進去，無傷大雅
-      }
+      } catch { /* 私密瀏覽模式可能存不進去，無傷大雅 */ }
       setStatus('ready')
+      setProgress(null)
       return model
     })()
 
@@ -85,6 +89,7 @@ export function VoskProvider({ children }) {
       throw err
     } finally {
       inflightRef.current = null
+      releaseScreenWakeLock()
     }
   }, [])
 
@@ -111,7 +116,7 @@ export function VoskProvider({ children }) {
   }, [])
 
   return (
-    <VoskContext.Provider value={{ status, model: modelRef.current, error, download, reset, getModel: () => modelRef.current }}>
+    <VoskContext.Provider value={{ status, progress, model: modelRef.current, error, download, reset, getModel: () => modelRef.current }}>
       {children}
     </VoskContext.Provider>
   )

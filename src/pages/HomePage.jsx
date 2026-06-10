@@ -11,7 +11,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const todayCount = useTodayCount()
-  const { status: voskStatus, download } = useVoskModel()
+  const { status: voskStatus, progress: voskProgress, download } = useVoskModel()
   const quota = useQuota([todayCount])
   const [micState, setMicState] = useState('idle') // idle | testing | ok | denied
   const [persisted, setPersisted] = useState(null) // null=未檢查, true/false
@@ -67,13 +67,18 @@ export default function HomePage() {
     <main className="flex-1 flex flex-col px-6 pt-6 pb-6">
       {/* 頂部狀態列 */}
       <div className="flex items-center justify-between text-xs mb-2 gap-2 flex-wrap">
-        <ModelChip status={voskStatus} onDownload={downloadModel} />
+        <ModelChip status={voskStatus} progress={voskProgress} onDownload={downloadModel} />
         <MicChip state={micState} onTest={testMic} />
       </div>
       {persisted === false && (
         <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
           💡 建議「加到主畫面」以鎖定儲存空間，避免系統自動清理你的資料
         </div>
+      )}
+
+      {/* 模型下載進度條 + 警告 */}
+      {(voskStatus === 'downloading' || (voskProgress && voskStatus !== 'ready')) && (
+        <DownloadProgress progress={voskProgress} status={voskStatus} />
       )}
 
       {/* 今日筆數 */}
@@ -137,7 +142,8 @@ export default function HomePage() {
   )
 }
 
-function ModelChip({ status, onDownload }) {
+function ModelChip({ status, progress, onDownload }) {
+  const hasPartial = progress && progress.downloaded > 0 && progress.downloaded < progress.total
   if (status === 'ready') {
     return (
       <span className="px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -159,10 +165,57 @@ function ModelChip({ status, onDownload }) {
       </button>
     )
   }
+  if (hasPartial) {
+    const pct = Math.floor((progress.downloaded / progress.total) * 100)
+    return (
+      <button onClick={onDownload} className="px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium">
+        ▶ 繼續下載（{pct}%）
+      </button>
+    )
+  }
   return (
     <button onClick={onDownload} className="px-2 py-1 rounded-full bg-zinc-700 text-zinc-200 font-medium">
       📥 下載語音模型 (42MB)
     </button>
+  )
+}
+
+function DownloadProgress({ progress, status }) {
+  const downloaded = progress?.downloaded ?? 0
+  const total = progress?.total ?? 0
+  const downloadedMB = (downloaded / 1024 / 1024).toFixed(1)
+  const totalMB = total ? (total / 1024 / 1024).toFixed(1) : '?'
+  const percent = total ? Math.min(100, (downloaded / total) * 100) : 0
+  const downloading = status === 'downloading'
+  const partial = !downloading && downloaded > 0 && downloaded < total
+
+  return (
+    <div className={`
+      mb-3 rounded-xl px-3 py-2 border
+      ${downloading
+        ? 'bg-sky-500/10 border-sky-500/30 text-sky-200'
+        : 'bg-amber-500/10 border-amber-500/30 text-amber-200'}
+    `}>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span>
+          {downloading ? '⏬ 下載中…' : partial ? '⏸ 已暫停（可續傳）' : '下載中…'}
+        </span>
+        <span className="tabular-nums">
+          {downloadedMB} / {totalMB} MB ({percent.toFixed(0)}%)
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+        <div
+          className={`h-full ${downloading ? 'bg-sky-400' : 'bg-amber-400'} transition-all`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {downloading && (
+        <div className="text-[10px] mt-1 opacity-80">
+          💡 請保持 app 開啟、不要鎖螢幕 — 已下載部分已存檔，中斷可續傳
+        </div>
+      )}
+    </div>
   )
 }
 
