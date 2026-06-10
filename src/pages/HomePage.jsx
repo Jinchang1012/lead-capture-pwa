@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createLeadPlaceholder, patchLead } from '../db/db.js'
 import { useTodayCount } from '../hooks/useLeads.js'
 import { useVoskModel } from '../hooks/useVoskModel.js'
 import { useQuota } from '../hooks/useQuota.js'
 import { compressImage } from '../utils/compress.js'
+import { isPersisted, requestPersist } from '../utils/quota.js'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -13,6 +14,23 @@ export default function HomePage() {
   const { status: voskStatus, download } = useVoskModel()
   const quota = useQuota([todayCount])
   const [micState, setMicState] = useState('idle') // idle | testing | ok | denied
+  const [persisted, setPersisted] = useState(null) // null=未檢查, true/false
+
+  // 啟動時請求持久化儲存，避免 Android 自動清掉 IndexedDB / Cache Storage
+  // Android Chrome 通常 PWA 已安裝時會直接核准、未安裝時會拒絕（這也是引導 user 加到主畫面的訊號）
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const already = await isPersisted()
+      if (already) {
+        if (alive) setPersisted(true)
+        return
+      }
+      const ok = await requestPersist()
+      if (alive) setPersisted(ok)
+    })()
+    return () => { alive = false }
+  }, [])
 
   async function handleCapture(e) {
     const file = e.target.files?.[0]
@@ -47,11 +65,16 @@ export default function HomePage() {
 
   return (
     <main className="flex-1 flex flex-col px-6 pt-6 pb-6">
-      {/* 頂部狀態列：語音模型狀態 */}
-      <div className="flex items-center justify-between text-xs mb-4">
+      {/* 頂部狀態列 */}
+      <div className="flex items-center justify-between text-xs mb-2 gap-2 flex-wrap">
         <ModelChip status={voskStatus} onDownload={downloadModel} />
         <MicChip state={micState} onTest={testMic} />
       </div>
+      {persisted === false && (
+        <div className="mb-3 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+          💡 建議「加到主畫面」以鎖定儲存空間，避免系統自動清理你的資料
+        </div>
+      )}
 
       {/* 今日筆數 */}
       <header className="flex flex-col items-center mb-2">
