@@ -24,9 +24,6 @@ export default function HomePage() {
       .then((blob) => patchLead(id, { photoBlob: blob, photoMime: blob.type || 'image/jpeg' }))
       .catch((err) => console.error('[home] 壓縮/儲存失敗', err))
   }
-  function triggerCamera() {
-    fileInputRef.current?.click()
-  }
 
   async function testMic() {
     setMicState('testing')
@@ -63,31 +60,34 @@ export default function HomePage() {
         <div className="text-zinc-500 text-sm mt-1">張名片</div>
       </header>
 
-      {/* 巨大拍照按鈕 */}
+      {/* 巨大拍照按鈕：用 label 原生觸發 file input（不靠 JS click，避免部分 Android 忽略 display:none input） */}
       <div className="flex-1 flex items-center justify-center">
-        <button
-          onClick={triggerCamera}
+        <label
+          htmlFor="capture-input"
+          role="button"
           className="
             w-[70vw] max-w-[320px] aspect-square rounded-full
             bg-emerald-500 active:bg-emerald-600
             shadow-[0_0_60px_rgba(16,185,129,0.35)]
             flex flex-col items-center justify-center
-            text-zinc-950 font-bold
+            text-zinc-950 font-bold cursor-pointer
             transition-all active:scale-95
           "
         >
           <span className="text-6xl mb-2">📷</span>
           <span className="text-2xl">拍名片</span>
-        </button>
+        </label>
       </div>
 
+      {/* file input：用 sr-only 視覺隱藏但保留可點性（display:none 會被部分瀏覽器忽略 click） */}
       <input
+        id="capture-input"
         ref={fileInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         onChange={handleCapture}
-        className="hidden"
+        className="sr-only"
       />
 
       {quota?.supported && quota.warn && (
