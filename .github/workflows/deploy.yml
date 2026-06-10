@@ -31,6 +31,8 @@ jobs:
       # SPA fallback：GH Pages 對深層路徑回 404，用 index.html 副本接住
       - run: cp dist/index.html dist/404.html
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
