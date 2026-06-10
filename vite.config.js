@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -6,21 +7,25 @@ import { VitePWA } from 'vite-plugin-pwa'
 // GitHub Pages 子路徑：https://<帳號>.github.io/lead-capture-pwa/
 const BASE = '/lead-capture-pwa/'
 
-// 版本字串：build 時間 + git short SHA（顯示在浮水印）
+// 從 package.json 讀 semver — 更新方式：手動改 package.json 的 "version"
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
+const SEMVER = pkg.version
+
+// git short SHA（部署追蹤用，可選）
 let gitSha = 'dev'
 try {
   gitSha = execSync('git rev-parse --short HEAD').toString().trim()
 } catch {
   /* CI 或無 git 環境 */
 }
-// 「MM-DD HH:mm」格式
+// 「MM-DD HH:mm」格式（build 時間）
 const buildTime = new Date().toISOString().slice(5, 16).replace('T', ' ')
-const APP_VERSION = `${buildTime} · ${gitSha}`
 
 export default defineConfig({
   base: BASE,
   define: {
-    __APP_VERSION__: JSON.stringify(APP_VERSION)
+    __APP_SEMVER__: JSON.stringify(SEMVER),
+    __APP_BUILD__: JSON.stringify(`${buildTime} · ${gitSha}`)
   },
   plugins: [
     react(),
