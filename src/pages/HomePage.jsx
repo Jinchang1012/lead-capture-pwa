@@ -11,7 +11,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const todayCount = useTodayCount()
-  const { status: voskStatus, progress: voskProgress, download } = useVoskModel()
+  const { status: voskStatus, progress: voskProgress, error: voskError, download } = useVoskModel()
   const quota = useQuota([todayCount])
   const [micState, setMicState] = useState('idle') // idle | testing | ok | denied
   const [persisted, setPersisted] = useState(null) // null=未檢查, true/false
@@ -79,6 +79,14 @@ export default function HomePage() {
       {/* 模型下載進度條 + 警告 */}
       {(voskStatus === 'downloading' || (voskProgress && voskStatus !== 'ready')) && (
         <DownloadProgress progress={voskProgress} status={voskStatus} />
+      )}
+
+      {/* 錯誤訊息（user 看得到實際失敗原因，方便回報） */}
+      {voskStatus === 'error' && voskError && (
+        <div className="mb-3 text-xs text-red-200 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2">
+          <div className="font-semibold mb-1">❌ 語音模型載入失敗</div>
+          <div className="break-words leading-relaxed">{String(voskError.message || voskError)}</div>
+        </div>
       )}
 
       {/* 今日筆數 */}
@@ -175,7 +183,7 @@ function ModelChip({ status, progress, onDownload }) {
   }
   return (
     <button onClick={onDownload} className="px-2 py-1 rounded-full bg-zinc-700 text-zinc-200 font-medium">
-      📥 下載語音模型 (42MB)
+      📥 下載語音模型 (32MB)
     </button>
   )
 }
