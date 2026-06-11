@@ -4,11 +4,12 @@ import { buildCsv } from './exportCsv.js'
 import { buildMarkdown, mdFilenameFor } from './exportMd.js'
 
 // 共用：把 leads 轉成 JSON-safe 物件（去掉 Blob，只留路徑與 metadata）
+// data.json 是無損原始格式（answers 用 key 不轉 label），規格 §9.2
 function leadToJsonRow(lead, photoPath, audioPath) {
   return {
     id: lead.id,
     createdAt: lead.createdAt,
-    tags: lead.tags,
+    answers: lead.answers ?? {},
     textNote: lead.textNote,
     transcript: lead.transcript,
     transcriptEdited: !!lead.transcriptEdited,

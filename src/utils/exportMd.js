@@ -1,24 +1,24 @@
-import { getProducts } from '../store/products.js'
+import { getQuestions } from '../store/questions.js'
 import { fmtIso, fmtTimestampFilename } from './download.js'
 
-function productLabelMap() {
-  return Object.fromEntries(getProducts().map((p) => [p.key, p.label]))
-}
+// Markdown 規格見 專案.md §9.3
+// frontmatter：每個問題組一行（title: [labels]），自訂問題同樣處理
 
-// 單筆 lead 轉一份 Markdown 字串
-// 圖片/音檔走相對路徑（zip 內可解析）
 export function buildMarkdown(lead, opts = {}) {
   const { photoPath, audioPath } = opts
-  const PRODUCT_LABEL = productLabelMap()
-  const products = (lead.tags?.products ?? []).map((k) => PRODUCT_LABEL[k] ?? k)
-  const grade = lead.tags?.grade ?? ''
+  const questions = getQuestions()
+
+  const answerLines = questions.map((q) => {
+    const keys = lead.answers?.[q.id] ?? []
+    const labels = keys.map((k) => q.options.find((o) => o.key === k)?.label ?? k)
+    return `${q.title}: [${labels.join(', ')}]`
+  })
 
   const front = [
     '---',
     `id: ${lead.id}`,
     `captured_at: ${fmtIso(lead.createdAt)}`,
-    `grade: ${grade}`,
-    `products: [${products.join(', ')}]`,
+    ...answerLines,
     audioPath ? `audio: ${audioPath}` : 'audio:',
     photoPath ? `photo: ${photoPath}` : 'photo:',
     `audio_duration: ${lead.audioDuration ?? ''}`,
@@ -39,10 +39,9 @@ export function buildMarkdown(lead, opts = {}) {
   return front + body
 }
 
-// 單筆 lead 對應的 md 檔名
-// 格式：{YYYYMMDD-HHMMSS}_{grade}_{id8}.md
+// 檔名：{YYYYMMDD-HHMMSS}_{gradeKey}_{id8}.md（無分級用 X）
 export function mdFilenameFor(lead) {
-  const grade = lead.tags?.grade ?? 'X'
+  const grade = lead.answers?.grade?.[0] ?? 'X'
   const id8 = lead.id.slice(0, 8)
   return `${fmtTimestampFilename(lead.createdAt)}_${grade}_${id8}.md`
 }

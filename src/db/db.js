@@ -1,26 +1,29 @@
 import Dexie from 'dexie'
 
-// 單一 table：leads
-// 主鍵 id；createdAt / grade 加索引以利排序與篩選
+// 資料模型規格見 專案.md §4
 export const db = new Dexie('lead_capture')
 
+// v1：初版（grade 索引指向不存在的頂層欄位，從未生效）
 db.version(1).stores({
   leads: 'id, createdAt, grade'
 })
 
-// 產品分類常數（標籤頁與匯出共用）
-export const PRODUCTS = [
-  { key: 'liquid_cooling', label: '廠務液冷' },
-  { key: 'advanced_packaging', label: '先進封裝' },
-  { key: 'automation', label: '自動化整合' },
-  { key: 'other', label: '其他' }
-]
-
-export const GRADES = [
-  { key: 'A', label: 'A 級', desc: '高意願' },
-  { key: 'B', label: 'B 級', desc: '潛在需求' },
-  { key: 'C', label: 'C 級', desc: '無效/同業' }
-]
+// v2：tags → answers 泛化（配合問題組系統，專案.md §6）
+//   tags.grade = 'A'          → answers.grade = ['A']
+//   tags.products = ['x','y'] → answers.products = ['x','y']
+db.version(2).stores({
+  leads: 'id, createdAt'
+}).upgrade((tx) =>
+  tx.table('leads').toCollection().modify((lead) => {
+    if (!lead.answers) {
+      const answers = {}
+      if (lead.tags?.grade) answers.grade = [lead.tags.grade]
+      if (lead.tags?.products?.length) answers.products = [...lead.tags.products]
+      lead.answers = answers
+    }
+    delete lead.tags
+  })
+)
 
 // 建立一筆 placeholder lead，photoBlob 之後 patch
 export async function createLeadPlaceholder() {
@@ -30,7 +33,7 @@ export async function createLeadPlaceholder() {
     createdAt: Date.now(),
     photoBlob: null,
     photoMime: 'image/jpeg',
-    tags: { grade: null, products: [] },
+    answers: {},
     textNote: '',
     audioBlob: null,
     audioMime: null,

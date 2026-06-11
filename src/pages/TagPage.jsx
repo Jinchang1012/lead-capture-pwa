@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { GRADES, patchLead } from '../db/db.js'
+import { patchLead } from '../db/db.js'
 import { useLead } from '../hooks/useLeads.js'
 import { useRecorder } from '../hooks/useRecorder.js'
 import { useVosk } from '../context/VoskContext.jsx'
-import { useFontSize, useProducts } from '../store/products.js'
+import { useFontSize, useQuestions } from '../store/questions.js'
 import { RECORD_MAX_SECONDS } from '../config.js'
 import TagButton from '../components/TagButton.jsx'
 import RecordButton from '../components/RecordButton.jsx'
@@ -14,7 +14,7 @@ export default function TagPage() {
   const navigate = useNavigate()
   const lead = useLead(id)
   const { status: voskStatus } = useVosk()
-  const PRODUCTS = useProducts()
+  const questions = useQuestions()
   const fontSize = useFontSize()
 
   // 即時轉寫顯示
@@ -66,17 +66,18 @@ export default function TagPage() {
     )
   }
 
-  const grade = lead.tags?.grade ?? null
-  const products = lead.tags?.products ?? []
-
-  function setGrade(g) {
-    const next = grade === g ? null : g
-    patchLead(id, { tags: { ...lead.tags, grade: next } })
-  }
-  function toggleProduct(p) {
-    const exists = products.includes(p)
-    const next = exists ? products.filter((x) => x !== p) : [...products, p]
-    patchLead(id, { tags: { ...lead.tags, products: next } })
+  // 問題組答案操作（規格 §6.3）：單選再點同選項 = 取消；複選 toggle；點擊即寫 DB
+  function toggleAnswer(question, optionKey) {
+    const current = lead.answers?.[question.id] ?? []
+    let next
+    if (question.type === 'single') {
+      next = current[0] === optionKey ? [] : [optionKey]
+    } else {
+      next = current.includes(optionKey)
+        ? current.filter((k) => k !== optionKey)
+        : [...current, optionKey]
+    }
+    patchLead(id, { answers: { ...lead.answers, [question.id]: next } })
   }
   function onNoteChange(text) {
     // 若 user 編輯了 transcript 後的文字，標記 edited
@@ -132,52 +133,43 @@ export default function TagPage() {
         )}
       </section>
 
-      {/* 中：分級 */}
-      <section>
-        <div className="text-zinc-400 text-sm mb-2">客戶分級</div>
-        <div className="grid grid-cols-3 gap-2">
-          {GRADES.map((g) => (
-            <TagButton
-              key={g.key}
-              active={grade === g.key}
-              onClick={() => setGrade(g.key)}
-              sub={g.desc}
-              variant="grade"
-              tagClass={fontSize.tagClass}
-              subClass={fontSize.subClass}
-            >
-              {g.label}
-            </TagButton>
-          ))}
-        </div>
-      </section>
-
-      {/* 產品標籤 */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-zinc-400 text-sm">產品關注</div>
-          <button
-            onClick={() => navigate('/settings')}
-            className="text-emerald-400 text-xs"
-          >
-            ✏️ 編輯
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {PRODUCTS.map((p) => (
-            <TagButton
-              key={p.key}
-              active={products.includes(p.key)}
-              onClick={() => toggleProduct(p.key)}
-              variant="product"
-              tagClass={fontSize.tagClass}
-              subClass={fontSize.subClass}
-            >
-              {p.label}
-            </TagButton>
-          ))}
-        </div>
-      </section>
+      {/* 問題組：依 store 定義動態渲染（規格 §6.3：single→3 欄 emerald，multi→2 欄 sky） */}
+      {questions.map((q, qi) => {
+        const selected = lead.answers?.[q.id] ?? []
+        return (
+          <section key={q.id}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-zinc-400 text-sm">
+                {q.title}
+                {q.type === 'multi' && <span className="text-zinc-600 text-xs">（可複選）</span>}
+              </div>
+              {qi === 0 && (
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="text-emerald-400 text-xs"
+                >
+                  ✏️ 編輯
+                </button>
+              )}
+            </div>
+            <div className={`grid gap-2 ${q.type === 'single' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {q.options.map((o) => (
+                <TagButton
+                  key={o.key}
+                  active={selected.includes(o.key)}
+                  onClick={() => toggleAnswer(q, o.key)}
+                  sub={o.desc}
+                  variant={q.type === 'single' ? 'grade' : 'product'}
+                  tagClass={fontSize.tagClass}
+                  subClass={fontSize.subClass}
+                >
+                  {o.label}
+                </TagButton>
+              ))}
+            </div>
+          </section>
+        )
+      })}
 
       {/* 語音轉寫結果（已存的 transcript 可手動編輯） */}
       {lead.transcript && !recorder.isRecording && (

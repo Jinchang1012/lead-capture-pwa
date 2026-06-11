@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { db, GRADES } from '../db/db.js'
+import { db } from '../db/db.js'
 import { useAllLeads } from '../hooks/useLeads.js'
 import { useQuota } from '../hooks/useQuota.js'
 import { exportCsv } from '../utils/exportCsv.js'
 import { exportZip, exportMarkdownBundle } from '../utils/exportZip.js'
-
-const GRADE_LABEL = Object.fromEntries(GRADES.map((g) => [g.key, g.label]))
 
 export default function ExportPage() {
   const navigate = useNavigate()
@@ -43,10 +41,10 @@ export default function ExportPage() {
     setClearText('')
   }
 
-  // 統計
+  // 統計（answers 制，規格 §4.1）
   const stats = leads.reduce(
     (acc, l) => {
-      const g = l.tags?.grade
+      const g = l.answers?.grade?.[0]
       if (g) acc.byGrade[g] = (acc.byGrade[g] ?? 0) + 1
       if (l.audioBlob) acc.withAudio += 1
       if (l.transcript) acc.withTranscript += 1

@@ -1,22 +1,9 @@
-import { getProducts } from '../store/products.js'
+import { getQuestions } from '../store/questions.js'
 import { downloadBlob, fmtIso, fmtTimestampFilename } from './download.js'
 
-// 匯出當下動態取（user 在設定頁改完立即生效）
-function productLabelMap() {
-  return Object.fromEntries(getProducts().map((p) => [p.key, p.label]))
-}
-
-// CSV 欄位：id, createdAt, grade, products, textNote, transcript, transcriptEdited, audioDuration
-const HEADERS = [
-  'id',
-  'createdAt',
-  'grade',
-  'products',
-  'textNote',
-  'transcript',
-  'transcriptEdited',
-  'audioDuration'
-]
+// CSV 規格見 專案.md §9.1
+// 欄位：id, createdAt, <每個問題組一欄>, textNote, transcript, transcriptEdited, audioDuration
+// 問題組欄位用「匯出當下」的定義轉 label；複選用 ; 分隔；對不到的 key 保留原 key
 
 function escapeCsv(value) {
   if (value === null || value === undefined) return ''
@@ -28,17 +15,27 @@ function escapeCsv(value) {
 }
 
 export function buildCsv(leads) {
-  const PRODUCT_LABEL = productLabelMap()
-  const lines = [HEADERS.join(',')]
+  const questions = getQuestions()
+  const headers = [
+    'id',
+    'createdAt',
+    ...questions.map((q) => q.title),
+    'textNote',
+    'transcript',
+    'transcriptEdited',
+    'audioDuration'
+  ]
+
+  const lines = [headers.join(',')]
   for (const lead of leads) {
-    const products = (lead.tags?.products ?? [])
-      .map((k) => PRODUCT_LABEL[k] ?? k)
-      .join(';')
+    const answerCols = questions.map((q) => {
+      const keys = lead.answers?.[q.id] ?? []
+      return keys.map((k) => q.options.find((o) => o.key === k)?.label ?? k).join(';')
+    })
     const row = [
       lead.id,
       fmtIso(lead.createdAt),
-      lead.tags?.grade ?? '',
-      products,
+      ...answerCols,
       lead.textNote ?? '',
       lead.transcript ?? '',
       lead.transcriptEdited ? '1' : '0',

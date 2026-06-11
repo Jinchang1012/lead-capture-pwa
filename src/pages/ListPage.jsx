@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { deleteLead, GRADES } from '../db/db.js'
+import { deleteLead } from '../db/db.js'
 import { useAllLeads } from '../hooks/useLeads.js'
-import { useProducts } from '../store/products.js'
+import { useQuestions } from '../store/questions.js'
 import LongPressDelete from '../components/LongPressDelete.jsx'
-
-const GRADE_LABEL = Object.fromEntries(GRADES.map((g) => [g.key, g.label]))
 
 export default function ListPage() {
   const navigate = useNavigate()
   const leads = useAllLeads()
+  const questions = useQuestions()
 
   return (
     <main className="flex-1 flex flex-col px-4 pt-3 pb-4 overflow-hidden">
@@ -34,27 +33,32 @@ export default function ListPage() {
           <div className="text-zinc-500 text-center mt-12">尚無紀錄</div>
         )}
         {leads.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onOpen={() => navigate(`/tag/${lead.id}`)} />
+          <LeadRow key={lead.id} lead={lead} onOpen={() => navigate(`/tag/${lead.id}`)} questions={questions} />
         ))}
       </div>
     </main>
   )
 }
 
-function LeadRow({ lead, onOpen }) {
-  const allProducts = useProducts()
-  const productLabel = useMemo(
-    () => Object.fromEntries(allProducts.map((p) => [p.key, p.label])),
-    [allProducts]
-  )
+function LeadRow({ lead, onOpen, questions }) {
   const photoUrl = useMemo(
     () => (lead.photoBlob ? URL.createObjectURL(lead.photoBlob) : null),
     [lead.photoBlob]
   )
   useEffect(() => () => photoUrl && URL.revokeObjectURL(photoUrl), [photoUrl])
 
-  const products = (lead.tags?.products ?? []).map((k) => productLabel[k] ?? k)
-  const grade = lead.tags?.grade
+  // 分級 chip 用 grade 組；其餘問題組答案合併成一行（對不到的 key 顯示原 key，規格 §6.3）
+  const gradeQ = questions.find((q) => q.id === 'grade')
+  const gradeKey = lead.answers?.grade?.[0]
+  const gradeLabel = gradeKey
+    ? (gradeQ?.options.find((o) => o.key === gradeKey)?.label ?? gradeKey)
+    : null
+  const otherLabels = questions
+    .filter((q) => q.id !== 'grade')
+    .flatMap((q) => {
+      const keys = lead.answers?.[q.id] ?? []
+      return keys.map((k) => q.options.find((o) => o.key === k)?.label ?? k)
+    })
 
   return (
     <div className="bg-surface rounded-2xl p-3 flex gap-3 items-center">
@@ -70,9 +74,9 @@ function LeadRow({ lead, onOpen }) {
 
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-2 text-sm mb-1">
-          {grade && (
+          {gradeLabel && (
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold">
-              {GRADE_LABEL[grade]}
+              {gradeLabel}
             </span>
           )}
           <span className="text-zinc-500 text-xs">
@@ -83,7 +87,7 @@ function LeadRow({ lead, onOpen }) {
           ) : null}
         </div>
         <div className="text-zinc-300 text-xs truncate">
-          {products.length ? products.join('、') : <span className="text-zinc-600">無產品標籤</span>}
+          {otherLabels.length ? otherLabels.join('、') : <span className="text-zinc-600">無標籤</span>}
         </div>
         {(lead.transcript || lead.textNote) && (
           <div className="text-zinc-500 text-xs truncate mt-1">
