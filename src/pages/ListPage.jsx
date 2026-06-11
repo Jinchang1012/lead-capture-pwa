@@ -10,17 +10,60 @@ export default function ListPage() {
   const rawLeads = useAllLeads()
   const questions = useQuestions()
 
-  // 待跟進置頂，其餘維持 createdAt 倒序（useAllLeads 已倒序）
+  const [search, setSearch] = useState('')
+  const [onlyFollowUp, setOnlyFollowUp] = useState(false)
+  // 選項篩選：{ [questionId]: Set<optionKey> }（任一命中即顯示，OR 邏輯）
+  const [optionFilter, setOptionFilter] = useState({})
+  const [showFilters, setShowFilters] = useState(false)
+
+  function toggleOption(qid, key) {
+    setOptionFilter((prev) => {
+      const set = new Set(prev[qid] ?? [])
+      if (set.has(key)) set.delete(key)
+      else set.add(key)
+      const next = { ...prev, [qid]: set }
+      if (set.size === 0) delete next[qid]
+      return next
+    })
+  }
+  function clearFilters() {
+    setSearch('')
+    setOnlyFollowUp(false)
+    setOptionFilter({})
+  }
+
+  const activeFilterCount =
+    (onlyFollowUp ? 1 : 0) +
+    Object.values(optionFilter).reduce((n, s) => n + s.size, 0) +
+    (search.trim() ? 1 : 0)
+
+  // 篩選 + 排序（待跟進置頂）
   const leads = useMemo(() => {
-    const followUps = rawLeads.filter((l) => l.followUp)
-    const rest = rawLeads.filter((l) => !l.followUp)
+    const q = search.trim().toLowerCase()
+    const filtered = rawLeads.filter((lead) => {
+      if (onlyFollowUp && !lead.followUp) return false
+      // 文字搜尋：備註 + 轉寫
+      if (q) {
+        const hay = `${lead.textNote ?? ''} ${lead.transcript ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      // 選項篩選：每個有篩選的問題組，lead 至少命中一個選項（組間 AND，組內 OR）
+      for (const [qid, set] of Object.entries(optionFilter)) {
+        const answered = lead.answers?.[qid] ?? []
+        if (!answered.some((k) => set.has(k))) return false
+      }
+      return true
+    })
+    const followUps = filtered.filter((l) => l.followUp)
+    const rest = filtered.filter((l) => !l.followUp)
     return [...followUps, ...rest]
-  }, [rawLeads])
+  }, [rawLeads, search, onlyFollowUp, optionFilter])
+
   const followCount = rawLeads.filter((l) => l.followUp).length
 
   return (
     <main className="flex-1 flex flex-col px-4 pt-3 pb-4 overflow-hidden">
-      <header className="flex items-center gap-3 mb-3 shrink-0">
+      <header className="flex items-center gap-3 mb-2 shrink-0">
         <button
           onClick={() => navigate('/', { replace: true })}
           className="px-3 h-10 rounded-xl bg-surface text-zinc-200 text-sm"
@@ -28,7 +71,7 @@ export default function ListPage() {
           ← 回首頁
         </button>
         <div className="flex-1 text-zinc-300 font-semibold">
-          所有紀錄（{leads.length}）
+          紀錄（{leads.length}{activeFilterCount > 0 ? `/${rawLeads.length}` : ''}）
           {followCount > 0 && <span className="text-amber-400 text-sm ml-2">⭐ {followCount}</span>}
         </div>
         <button
@@ -39,9 +82,77 @@ export default function ListPage() {
         </button>
       </header>
 
+      {/* 搜尋列 */}
+      <div className="flex gap-2 mb-2 shrink-0">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜尋備註 / 語音轉寫…"
+          className="flex-1 h-11 rounded-xl bg-surface text-zinc-100 px-3 text-sm outline-none focus:ring-1 focus:ring-emerald-500/50"
+        />
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className={`px-3 h-11 rounded-xl text-sm shrink-0 ${
+            showFilters || activeFilterCount > 0
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              : 'bg-surface text-zinc-300'
+          }`}
+        >
+          篩選{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+        </button>
+      </div>
+
+      {/* 篩選面板 */}
+      {showFilters && (
+        <div className="mb-2 p-3 bg-surface rounded-xl space-y-3 shrink-0 max-h-[40vh] overflow-y-auto">
+          <button
+            onClick={() => setOnlyFollowUp((v) => !v)}
+            className={`px-3 h-9 rounded-full text-sm ${
+              onlyFollowUp
+                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/50'
+                : 'bg-zinc-800 text-zinc-400'
+            }`}
+          >
+            ⭐ 只看待跟進
+          </button>
+
+          {questions.map((q) => (
+            <div key={q.id}>
+              <div className="text-zinc-500 text-xs mb-1">{q.title}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {q.options.map((o) => {
+                  const active = optionFilter[q.id]?.has(o.key)
+                  return (
+                    <button
+                      key={o.key}
+                      onClick={() => toggleOption(q.id, o.key)}
+                      className={`px-2.5 h-8 rounded-full text-xs ${
+                        active
+                          ? 'bg-emerald-500 text-zinc-950 font-medium'
+                          : 'bg-zinc-800 text-zinc-300'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} className="text-zinc-500 text-xs underline">
+              清除全部篩選
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto pr-1 space-y-2">
         {leads.length === 0 && (
-          <div className="text-zinc-500 text-center mt-12">尚無紀錄</div>
+          <div className="text-zinc-500 text-center mt-12">
+            {rawLeads.length === 0 ? '尚無紀錄' : '無符合篩選的紀錄'}
+          </div>
         )}
         {leads.map((lead) => (
           <LeadRow key={lead.id} lead={lead} onOpen={() => navigate(`/tag/${lead.id}`)} questions={questions} />
