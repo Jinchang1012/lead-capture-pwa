@@ -7,8 +7,16 @@ import LongPressDelete from '../components/LongPressDelete.jsx'
 
 export default function ListPage() {
   const navigate = useNavigate()
-  const leads = useAllLeads()
+  const rawLeads = useAllLeads()
   const questions = useQuestions()
+
+  // 待跟進置頂，其餘維持 createdAt 倒序（useAllLeads 已倒序）
+  const leads = useMemo(() => {
+    const followUps = rawLeads.filter((l) => l.followUp)
+    const rest = rawLeads.filter((l) => !l.followUp)
+    return [...followUps, ...rest]
+  }, [rawLeads])
+  const followCount = rawLeads.filter((l) => l.followUp).length
 
   return (
     <main className="flex-1 flex flex-col px-4 pt-3 pb-4 overflow-hidden">
@@ -19,7 +27,10 @@ export default function ListPage() {
         >
           ← 回首頁
         </button>
-        <div className="flex-1 text-zinc-300 font-semibold">所有紀錄（{leads.length}）</div>
+        <div className="flex-1 text-zinc-300 font-semibold">
+          所有紀錄（{leads.length}）
+          {followCount > 0 && <span className="text-amber-400 text-sm ml-2">⭐ {followCount}</span>}
+        </div>
         <button
           onClick={() => navigate('/export')}
           className="px-3 h-10 rounded-xl bg-emerald-500 text-zinc-950 text-sm font-medium"
@@ -61,8 +72,10 @@ function LeadRow({ lead, onOpen, questions }) {
     })
 
   return (
-    <div className="bg-surface rounded-2xl p-3 flex gap-3 items-center">
-      <button onClick={onOpen} className="shrink-0">
+    <div className={`rounded-2xl p-3 flex gap-3 items-center ${
+      lead.followUp ? 'bg-amber-400/10 border border-amber-400/30' : 'bg-surface'
+    }`}>
+      <button onClick={onOpen} className="shrink-0 relative">
         <div className="w-16 h-16 rounded-xl bg-zinc-800 overflow-hidden flex items-center justify-center text-zinc-600 text-xs">
           {photoUrl ? (
             <img src={photoUrl} alt="名片" className="w-full h-full object-cover" />
@@ -70,6 +83,9 @@ function LeadRow({ lead, onOpen, questions }) {
             '無圖'
           )}
         </div>
+        {lead.followUp && (
+          <span className="absolute -top-1 -right-1 text-sm">⭐</span>
+        )}
       </button>
 
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">

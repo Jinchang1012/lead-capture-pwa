@@ -18,6 +18,7 @@ export function buildMarkdown(lead, opts = {}) {
     '---',
     `id: ${lead.id}`,
     `captured_at: ${fmtIso(lead.createdAt)}`,
+    `follow_up: ${lead.followUp ? 'true' : 'false'}`,
     ...answerLines,
     audioPath ? `audio: ${audioPath}` : 'audio:',
     photoPath ? `photo: ${photoPath}` : 'photo:',

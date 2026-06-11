@@ -86,6 +86,9 @@ export default function TagPage() {
   function onTranscriptEdit(text) {
     patchLead(id, { transcript: text, transcriptEdited: true })
   }
+  function toggleFollowUp() {
+    patchLead(id, { followUp: !lead.followUp })
+  }
   function complete() {
     // 若還在錄音，先停
     if (recorder.isRecording) recorder.stop()
@@ -129,6 +132,18 @@ export default function TagPage() {
                 <div className="text-zinc-500 text-xs mt-1 line-clamp-1">🎙️ {lead.transcript}</div>
               )}
             </div>
+            {/* ⭐ 待跟進標記（規格 §11 v0.0.3） */}
+            <button
+              onClick={toggleFollowUp}
+              className={`w-14 h-14 rounded-2xl shrink-0 text-2xl transition-all active:scale-95 ${
+                lead.followUp
+                  ? 'bg-amber-400/20 border border-amber-400/50'
+                  : 'bg-surface border border-zinc-700'
+              }`}
+              aria-label="待跟進"
+            >
+              {lead.followUp ? '⭐' : '☆'}
+            </button>
           </>
         )}
       </section>

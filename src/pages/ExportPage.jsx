@@ -48,9 +48,10 @@ export default function ExportPage() {
       if (g) acc.byGrade[g] = (acc.byGrade[g] ?? 0) + 1
       if (l.audioBlob) acc.withAudio += 1
       if (l.transcript) acc.withTranscript += 1
+      if (l.followUp) acc.followUp += 1
       return acc
     },
-    { byGrade: {}, withAudio: 0, withTranscript: 0 }
+    { byGrade: {}, withAudio: 0, withTranscript: 0, followUp: 0 }
   )
 
   return (
@@ -70,8 +71,8 @@ export default function ExportPage() {
         <div className="text-zinc-400 text-xs mb-2">總覽</div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <Stat label="總筆數" value={leads.length} />
+          <Stat label="⭐ 待跟進" value={stats.followUp} />
           <Stat label="有語音" value={stats.withAudio} />
-          <Stat label="有轉寫" value={stats.withTranscript} />
           <Stat
             label="A / B / C"
             value={`${stats.byGrade.A ?? 0} / ${stats.byGrade.B ?? 0} / ${stats.byGrade.C ?? 0}`}

@@ -34,6 +34,7 @@ export async function createLeadPlaceholder() {
     photoBlob: null,
     photoMime: 'image/jpeg',
     answers: {},
+    followUp: false,
     textNote: '',
     audioBlob: null,
     audioMime: null,

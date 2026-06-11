@@ -9,6 +9,7 @@ function leadToJsonRow(lead, photoPath, audioPath) {
   return {
     id: lead.id,
     createdAt: lead.createdAt,
+    followUp: !!lead.followUp,
     answers: lead.answers ?? {},
     textNote: lead.textNote,
     transcript: lead.transcript,

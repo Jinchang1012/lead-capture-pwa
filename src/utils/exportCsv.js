@@ -19,6 +19,7 @@ export function buildCsv(leads) {
   const headers = [
     'id',
     'createdAt',
+    'followUp',
     ...questions.map((q) => q.title),
     'textNote',
     'transcript',
@@ -26,8 +27,14 @@ export function buildCsv(leads) {
     'audioDuration'
   ]
 
+  // 排序：待跟進在前，再按 createdAt 倒序（規格 §9.1）
+  const sorted = [...leads].sort((a, b) => {
+    if (!!a.followUp !== !!b.followUp) return a.followUp ? -1 : 1
+    return b.createdAt - a.createdAt
+  })
+
   const lines = [headers.join(',')]
-  for (const lead of leads) {
+  for (const lead of sorted) {
     const answerCols = questions.map((q) => {
       const keys = lead.answers?.[q.id] ?? []
       return keys.map((k) => q.options.find((o) => o.key === k)?.label ?? k).join(';')
@@ -35,6 +42,7 @@ export function buildCsv(leads) {
     const row = [
       lead.id,
       fmtIso(lead.createdAt),
+      lead.followUp ? '1' : '0',
       ...answerCols,
       lead.textNote ?? '',
       lead.transcript ?? '',
